@@ -252,6 +252,20 @@ summary {
         font-size: 12px !important;
     }
     .layout {
-        flex-direction: column;
+        flex-direction: column !important;
+    }
+}
+@media (max-width: 500px) {
+    h1 {
+        font-size: 17px;
+    }
+    h2 {
+        font-size: 14px;
+    }
+    div, p {
+        font-size: 12px !important;
+    }
+    section {
+        flex-direction: column !important;
     }
 }
