@@ -6,7 +6,7 @@
         <link rel="stylesheet" href="hex_merge_advisor.css" />
         <title>육각형 병합 퍼즐 배치 추천기</title>
     </head>
-    <body>
+    <body oncontextmenu="return false">
         <main>
             <h1>육각형 병합 퍼즐 · 배치 추천기</h1>
             <p class="sub">
@@ -239,7 +239,7 @@
                         );
                         t.setAttribute("x", c.x);
                         t.setAttribute("y", c.y);
-                        t.setAttribute("class", "celltext celltext-recommended");
+                        t.setAttribute("class", "celltext " + (highlight.includes(c.k) && "celltext-recommended"));
                         const highlightIndex = highlight.indexOf(c.k);
                         t.textContent = v || highlightLevels[highlightIndex] || "";
                         svg.appendChild(t);
@@ -274,13 +274,13 @@
                 for (let r = 0; r < miniRows.length; r++) {
                     for (let c = 0; c < miniRows[r]; c++) {
                         const q = c - Math.floor(r / 2);
-                        miniCells.push({ q, r, k: key(q, r), x: 260 - (34 + r * 47), y: 70 + (q + r / 2) * 54 });
+                        miniCells.push({ q, r, k: key(q, r), x: 190 - (34 + r * 47), y: 50 + (q + r / 2) * 54 });
                     }
                 }
                 const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("viewBox", "0 0 260 330");
-                svg.setAttribute("width", "260");
-                svg.setAttribute("height", "330");
+                svg.setAttribute("viewBox", "0 0 200 200");
+                svg.setAttribute("width", "200");
+                svg.setAttribute("height", "200");
                 svg.style.cssText = "display:block;max-width:100%;overflow:visible;";
 
                 const selected = Object.entries(pieceBoard)
@@ -295,7 +295,8 @@
                     polygon.setAttribute("stroke", level ? "#dbe5f5" : "#596273");
                     polygon.setAttribute("stroke-width", "1.5");
                     polygon.style.cursor = "pointer";
-                    polygon.addEventListener("click", () => {
+                    polygon.addEventListener("mousedown", (e) => {
+                        console.log(e);
                         const current = pieceBoard[c.k] || 0;
                         if (current === 0) {
                             if (selected.length >= 3) {
@@ -347,7 +348,7 @@
                 const resetButton = document.createElement("button");
                 resetButton.type = "button";
                 resetButton.textContent = "블록 보드 초기화";
-                resetButton.style.cssText = "display:block;margin-top:10px;padding:8px 12px;border:1px solid #596273;border-radius:8px;background:#252b37;color:#f3f4f6;cursor:pointer;z-index: 1;";
+                resetButton.style.cssText = "display:block;margin-top:10px;padding:8px 12px;border:1px solid #596273;border-radius:8px;background:#252b37;color:#f3f4f6;cursor:pointer;margin-left: 36%;";
                 resetButton.addEventListener("click", () => {
                     pieceBoard = { "0,0": 1 };
                     syncPieceFromBoard();
