@@ -130,11 +130,14 @@ button.active {
 }
 .celltext {
     font-size: 13px;
-    fill: #fff;
+    fill: black;
     text-anchor: middle;
     dominant-baseline: central;
     pointer-events: none;
     font-weight: 700;
+}
+.celltext-recommended {
+    fill: white;
 }
 .legend {
     display: flex;
@@ -158,14 +161,14 @@ button.active {
 .pieceCells > svg {
     position: absolute;
     transform: scale(1.4);
-    top: 35%;
-    left: 55%;
+    top: 37%;
+    left: 51%;
     z-index: 0;
 }
 .controls {
     position: relative;
     background: transparent;
-    margin-top: 55%;
+    margin-top: 60%;
     z-index: 1;
 }
 .pieceCell {

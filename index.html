@@ -137,7 +137,7 @@
                 pieceLevels = [1],
                 recommendation = null,
                 undoBoard = null,
-                pieceBoard = { "0,0": 1 };
+                pieceBoard = { "-1,2": 1 };
             const shapes = {
                 single: [[0, 0]],
                 domino: [
@@ -201,7 +201,7 @@
                 }
                 return a.join(" ");
             }
-            function drawBoard(highlight = [], preview = []) {
+            function drawBoard(highlight = [], preview = [], highlightLevels = []) {
                 let svg = document.querySelector("#board");
                 svg.innerHTML = "";
                 cells.forEach((c) => {
@@ -222,7 +222,7 @@
                         "fill",
                         v ? colors[v] || "#ffffff" : "#2a2f3b",
                     );
-                    p.addEventListener("click", (e) => {
+                    p.addEventListener("click", () => {
                         undoBoard = { ...board };
                         board[c.k] = (board[c.k] + 1) % 11;
                         recommendation = null;
@@ -230,15 +230,18 @@
                         updateStats();
                     });
                     svg.appendChild(p);
-                    if (v) {
+                    // 기존 레벨 숫자는 그대로 표시하고, 추천 위치가 빈칸이면
+                    // 해당 위치에 놓일 블록의 레벨 숫자도 함께 표시한다.
+                    if (v || highlight.includes(c.k)) {
                         let t = document.createElementNS(
                             "http://www.w3.org/2000/svg",
                             "text",
                         );
                         t.setAttribute("x", c.x);
                         t.setAttribute("y", c.y);
-                        t.setAttribute("class", "celltext");
-                        t.textContent = v;
+                        t.setAttribute("class", "celltext celltext-recommended");
+                        const highlightIndex = highlight.indexOf(c.k);
+                        t.textContent = v || highlightLevels[highlightIndex] || "";
                         svg.appendChild(t);
                     }
                 });
@@ -271,13 +274,13 @@
                 for (let r = 0; r < miniRows.length; r++) {
                     for (let c = 0; c < miniRows[r]; c++) {
                         const q = c - Math.floor(r / 2);
-                        miniCells.push({ q, r, k: key(q, r), x: 70 + (q + r / 2) * 54, y: 34 + r * 47 });
+                        miniCells.push({ q, r, k: key(q, r), x: 260 - (34 + r * 47), y: 70 + (q + r / 2) * 54 });
                     }
                 }
                 const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svg.setAttribute("viewBox", "0 0 330 260");
-                svg.setAttribute("width", "330");
-                svg.setAttribute("height", "260");
+                svg.setAttribute("viewBox", "0 0 260 330");
+                svg.setAttribute("width", "260");
+                svg.setAttribute("height", "330");
                 svg.style.cssText = "display:block;max-width:100%;overflow:visible;";
 
                 const selected = Object.entries(pieceBoard)
@@ -340,6 +343,19 @@
                     }
                 });
                 el.appendChild(svg);
+
+                const resetButton = document.createElement("button");
+                resetButton.type = "button";
+                resetButton.textContent = "블록 보드 초기화";
+                resetButton.style.cssText = "display:block;margin-top:10px;padding:8px 12px;border:1px solid #596273;border-radius:8px;background:#252b37;color:#f3f4f6;cursor:pointer;z-index: 1;";
+                resetButton.addEventListener("click", () => {
+                    pieceBoard = { "0,0": 1 };
+                    syncPieceFromBoard();
+                    recommendation = null;
+                    renderPieceLevels();
+                    document.querySelector("#status").textContent = "놓을 블록 보드를 초기화했습니다.";
+                });
+                el.appendChild(resetButton);
             }
 
             function isConnectedPiece(items) {
@@ -542,7 +558,7 @@
                     recommendation.merges;
                 status.textContent = `가능한 배치 ${list.length}개를 비교했습니다. 점수가 높은 순서로 표시합니다.`;
                 let cellsBest = recommendation.pos;
-                drawBoard(cellsBest, []);
+                drawBoard(cellsBest, [], pieceLevels);
                 document.querySelector("#bestSummary").innerHTML =
                     `<div class="stats"><div class="stat"><b>${recommendation.merges}</b><span>예상 연쇄 병합</span></div><div class="stat"><b>${cells.filter((c) => !recommendation.board[c.k]).length}</b><span>배치 후 빈칸</span></div><div class="stat"><b>${Math.round(recommendation.score)}</b><span>휴리스틱 점수</span></div></div>`;
                 list.slice(0, 8).forEach((p, i) => {
@@ -557,7 +573,7 @@
                     d.innerHTML = `<div><strong>${i + 1}위 · ${coords}</strong><small>병합 ${p.merges}회 · 배치 후 빈칸 ${cells.filter((c) => !p.board[c.k]).length}</small></div><span class="pill">${Math.round(p.score)}점</span>`;
                     d.addEventListener("click", () => {
                         recommendation = p;
-                        drawBoard(p.pos, []);
+                        drawBoard(p.pos, [], pieceLevels);
                         document.querySelector("#applyBest").disabled = false;
                         document
                             .querySelectorAll(".result")
