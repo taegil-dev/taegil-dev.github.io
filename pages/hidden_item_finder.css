@@ -25,10 +25,10 @@ body{
     padding:25px
 }
 .wrap{
-    width: 45%;
+    width: 800px;
 }
 .rightbar {
-    width: 10%;
+    width: 150px;
     height: 10%;
     margin-top: 13% !important;
 }
@@ -137,4 +137,10 @@ input[type=number]{
     display:flex;
     gap:16px;
     flex-wrap:wrap
+}
+
+@media (max-width: 1100px) {
+    body {
+        display: block;
+    }
 }
