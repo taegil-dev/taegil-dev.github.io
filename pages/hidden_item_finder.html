@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width,initial-scale=1" name="viewport"/>
+        <link href="hidden_item_finder.css" rel="stylesheet"/>
+        <title>
+            발굴 탐색기
+        </title>
+    </head>
+    <body oncontextmenu="return false">
+        <div class="wrap">
+            <h1>
+                발굴 탐색기
+            </h1>
+            <p class="muted">
+                발견 시 모양만 선택 · 아이템 개수 설정 가능 · 가로 4칸 / 세로 4칸 / 2×2 · 겹침 불가 · 인접 가능
+            </p>
+            <div class="panel toolbar" style="flex-direction:column;gap:16px">
+                <div>
+                    <label>
+                        크기
+                        <input id="rows" max="16" min="2" type="number" value="8"/>
+                        행 × 열
+                        <input id="cols" max="16" min="2" type="number" value="8"/>
+                    </label>
+                    <label>
+                        화석 개수
+                        <input id="items" max="64" min="1" type="number" value="5"/>
+                    </label>
+                </div>
+                <div style="display:flex;">
+                    <button id="resize">
+                        새 보드
+                    </button>
+                    <button id="undo">
+                        되돌리기
+                    </button>
+                    <button id="reset">
+                        초기화
+                    </button>
+                    <label>
+                        <input checked="" id="prob" type="checkbox"/>
+                        확률 표시
+                    </label>
+                    <div style="flex-grow:1"></div>
+                    <label>
+                        최대 표본 시도 기준
+                        <select id="samples">
+                            <option value="10000">
+                                10,000
+                            </option>
+                            <option selected="" value="30000">
+                                30,000
+                            </option>
+                            <option value="100000">
+                                100,000
+                            </option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="stats">
+                    <span>
+                        발견한 칸
+                        <b id="hits">
+                            0
+                        </b>
+                        / <b id="target">3</b>
+                    </span>
+                    <span>
+                        빈칸
+                        <b id="misses">
+                            0
+                        </b>
+                    </span>
+                    <span>
+                        추천
+                        <b id="best">
+                            -
+                        </b>
+                    </span>
+                    <span>
+                        추정 확률
+                        <b id="chance">
+                            -
+                        </b>
+                    </span>
+                </div>
+                <div class="board" id="board">
+                </div>
+                <div class="legend muted">
+                    <span>
+                        초록색: 가로 발견 · 청록색: 세로 발견 · 보라색: 2×2 발견 · ×: 빈칸
+                    </span>
+                    <span>
+                        노란 테두리: 추천
+                    </span>
+                </div>
+                <p class="muted" id="status">
+                </p>
+            </div>
+            <p class="muted">
+                가능한 조합이 적으면 정확 계산, 많으면 시간 제한(약 1.4초)이 있는 조건부 표본 계산을 사용합니다. 조건부 표본 계산은 편향될 수 있으며 표본이 부족하면 결과가 불안정할 수 있습니다. 가능한 최종 배치가 동일 확률이라는 가정입니다. 발견 칸의 모양은 알 수 있지만 파츠 번호는 사용하지 않습니다. 발견한 아이템의 네 칸은 직접 표시해야 합니다.
+            </p>
+        </div>
+         <div class="panel toolbar rightbar">
+            <label>발견할 화석 모양
+                <select id="shapeChoice">
+                    <option value="1">가로 4칸 (1×4)</option>
+                    <option value="2">세로 4칸 (4×1)</option>
+                    <option value="3">정사각형 (2×2)</option>
+                </select>
+            </label>
+            <span class="muted">클릭: 선택한 모양으로 발견 → 없음 → 초기화 (우클릭 시 바로 초기화)</span>
+        </div>
+        <script>
+        let rows=8,cols=8,itemCount=3,state=[],history=[],generation=0;
+        // 0 = 미확인, 1 = 가로 발견, 2 = 세로 발견, 3 = 2x2 발견, 4 = 빈칸
+        const $ = id => document.getElementById(id);
+        let worker = null;
+        function init() {
+            rows = Math.max(2, Math.min(16, Math.floor(Number($('rows').value) || 8)));
+            cols = Math.max(2, Math.min(16, Math.floor(Number($('cols').value) || 8)));
+            itemCount = Math.max(1, Math.min(Math.floor(rows * cols / 4), Math.floor(Number($('items').value) || 3)));
+            $('rows').value = rows;
+            $('cols').value = cols;
+            $('items').max = Math.floor(rows * cols / 4);
+            $('items').value = itemCount;
+            $('target').textContent = itemCount * 4;
+            state = Array(rows * cols).fill(0);
+            history = [];
+            render();
+            compute();
+        }
+        function render(probs = [], best = -1) {
+            const board = $('board');
+            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            board.innerHTML = '';
+            state.forEach((v, i) => {
+                const b = document.createElement('button');
+                b.className = 'cell ' + (v >= 1 && v <= 3 ? 'hit' + (v === 2 ? ' hit-vertical' : v === 3 ? ' hit-square' : '') : v === 4 ? 'miss' : '') + (i === best && v === 0 ? ' best' : '');
+                b.title = `${Math.floor(i / cols) + 1}행 ${i % cols + 1}열`;
+                b.textContent = v >= 1 && v <= 3 ? ['','가','세','□'][v] : v === 4 ? '×' : $('prob').checked && probs[i] != null ? `${(probs[i] * 100).toFixed(1)}%` : '';
+                b.onclick = () => {
+                    history.push([...state]);
+                    state[i] = state[i] === 0 ? Number($('shapeChoice').value) : state[i] === 4 ? 0 : 4;
+                    render();
+                    compute();
+                };
+                b.oncontextmenu = e => {
+                    e.preventDefault();
+                    if (state[i] === 0) return;
+                    history.push([...state]);
+                    state[i] = 0;
+                    render();
+                    compute();
+                };
+                board.appendChild(b);
+            });
+            $('hits').textContent = state.filter(v => v >= 1 && v <= 3).length;
+            $('misses').textContent = state.filter(v => v === 4).length;
+            $('best').textContent = best < 0 ? '-' : `${Math.floor(best / cols) + 1}행 ${best % cols + 1}열`;
+            $('chance').textContent = best < 0 || probs[best] == null ? '-' : `${(probs[best] * 100).toFixed(1)}%`;
+        }
+        // Web Worker prevents UI blocking.
+        const workerCode = `
+        onmessage = e => {
+            const {rows, cols, itemCount, state, limit} = e.data;
+            const N = rows * cols;
+            const bit = Array.from({length: N}, (_, i) => 1n << BigInt(i));
+            const hits = [];
+            let hitMask = 0n;
+            for (let i = 0; i < N; i++) if (state[i] >= 1 && state[i] <= 3) {
+                hits.push(i);
+                hitMask |= bit[i];
+            }
+            if (hits.length > itemCount * 4) {
+                postMessage({error: '발견 칸이 아이템 전체 칸 수를 초과합니다.'});
+                return;
+            }
+            const shapes = [
+                [[0,0],[0,1],[0,2],[0,3]],
+                [[0,0],[1,0],[2,0],[3,0]],
+                [[0,0],[0,1],[1,0],[1,1]]
+            ];
+            const placements = [];
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                for (let shapeIndex = 0; shapeIndex < shapes.length; shapeIndex++) {
+                    const shape = shapes[shapeIndex];
+                    if (shape.some(([dr,dc]) => r + dr >= rows || c + dc >= cols)) continue;
+                    const ids = shape.map(([dr,dc]) => (r + dr) * cols + c + dc);
+                    if (ids.some(id => state[id] === 4)) continue;
+                    const shapeType = shapeIndex + 1;
+                    if (ids.some(id => state[id] >= 1 && state[id] <= 3 && state[id] !== shapeType)) continue;
+                    const mask = ids.reduce((m,id) => m | bit[id], 0n);
+                    placements.push({mask, hit: mask & hitMask, shapeType});
+                }
+            }
+            const P = placements.length;
+            const counts = new Float64Array(N);
+            let total = 0, nodes = 0, truncated = false, exact = false, attempts = 0;
+            const deadline = Date.now() + 1300;
+            const maxNodes = Math.max(15000, Math.min(350000, limit * 5));
+            const hitCandidates = hits.map(id => placements.map((p,i) => ((p.mask & bit[id]) && p.shapeType === state[id]) ? i : -1).filter(i => i >= 0));
+            if (hitCandidates.some(a => a.length === 0) || P < itemCount) {
+                postMessage({error: '현재 발견/빈칸 조건에 맞는 배치가 없습니다.'});
+                return;
+            }
+            function record(mask) {
+                if ((mask & hitMask) !== hitMask) return;
+                total++;
+                for (let i = 0; i < N; i++) if (state[i] === 0 && (mask & bit[i])) counts[i]++;
+            }
+            function visit(start, depth, mask) {
+                if (++nodes > maxNodes || Date.now() > deadline) { truncated = true; return; }
+                if (depth === itemCount) { record(mask); return; }
+                for (let i = start; i <= P - (itemCount - depth); i++) {
+                    if (truncated) return;
+                    if (!(mask & placements[i].mask)) visit(i + 1, depth + 1, mask | placements[i].mask);
+                }
+            }
+            function combinations(n, k) {
+                let v = 1;
+                for (let i = 1; i <= k; i++) {
+                    v = v * (n - i + 1) / i;
+                    if (v > 120000) return v;
+                }
+                return v;
+            }
+            if (combinations(P, itemCount) <= 120000) {
+                visit(0, 0, 0n);
+                exact = !truncated;
+            }
+            if (!exact) {
+                counts.fill(0);
+                total = 0;
+                nodes = 0;
+                function sample(mask, depth, covered) {
+                    if (++nodes > maxNodes || Date.now() > deadline) return false;
+                    if (depth === itemCount) {
+                        if (covered === hitMask) { record(mask); return true; }
+                        return false;
+                    }
+                    let choices = null;
+                    for (let h = 0; h < hits.length; h++) {
+                        if (covered & bit[hits[h]]) continue;
+                        const opts = hitCandidates[h].filter(i => !(placements[i].mask & mask));
+                        if (!opts.length) return false;
+                        if (choices === null || opts.length < choices.length) choices = opts;
+                    }
+                    if (choices === null) {
+                        choices = [];
+                        for (let i = 0; i < P; i++) if (!(placements[i].mask & mask)) choices.push(i);
+                    }
+                    const tries = Math.min(choices.length, Math.max(5, Math.floor(35 / (depth + 1))));
+                    for (let t = 0; t < tries; t++) {
+                        const j = t + Math.floor(Math.random() * (choices.length - t));
+                        [choices[t], choices[j]] = [choices[j], choices[t]];
+                        const p = placements[choices[t]];
+                        if (sample(mask | p.mask, depth + 1, covered | p.hit)) return true;
+                    }
+                    return false;
+                }
+                while (attempts < limit && nodes < maxNodes && Date.now() < deadline) {
+                    attempts++;
+                    sample(0n, 0, 0n);
+                }
+            }
+            const probs = Array.from(counts, x => total ? x / total : null);
+            let best = -1;
+            for (let i = 0; i < N; i++) {
+                if (state[i] === 0 && probs[i] !== null && (best < 0 || probs[i] > probs[best])) best = i;
+            }
+            postMessage({probs, best, total, exact, P, attempts, remaining: itemCount});
+        };
+        `;
+        let watchdog=null;
+        let workerUrl=null;
+
+        function stopWorker(){
+            if(watchdog!==null){
+                clearTimeout(watchdog);
+                watchdog=null;
+            }
+            if(worker){
+                worker.terminate();
+                worker=null;
+            }
+            if(workerUrl){
+                URL.revokeObjectURL(workerUrl);
+                workerUrl=null;
+            }
+        }
+
+        function compute(){
+            generation++;
+            const currentGeneration=generation;
+            stopWorker();
+            if (state.filter(v => v >= 1 && v <= 3).length === itemCount * 4) {
+                render();
+                $('status').textContent = '모든 아이템 칸을 발견했습니다.';
+                return;
+            }
+            $('status').textContent='가능한 배치를 계산 중...';
+
+            try{
+                workerUrl=URL.createObjectURL(new Blob([workerCode],{
+                    type:'text/javascript'
+                }));
+                worker=new Worker(workerUrl);
+                worker.onmessage=(event)=>{
+                    if(currentGeneration!==generation)return;
+                    const {probs,best,total,exact,P,attempts,error,remaining}=event.data;
+                    stopWorker();
+                    render(probs,best);
+                    if(error){$('status').textContent=error;return;}
+                    $('status').textContent=total===0
+                        ? exact ? '조건에 맞는 배치가 없습니다. 입력 상태를 확인하세요.' : '조건에 맞는 표본을 찾지 못했습니다. 표본 시도를 늘리거나 입력 상태를 확인하세요.'
+                        : exact
+                            ? `정확 계산: 유효한 ${remaining}개 아이템 조합 ${total.toLocaleString()}개 (단일 아이템 후보 ${P}개)`
+                            : `근사 계산: 유효 표본 ${total.toLocaleString()}개, 시도 ${attempts.toLocaleString()}회. 조건부 탐색 근사값으로 편향될 수 있습니다.`;
+                };
+                worker.onerror=(event)=>{
+                    if(currentGeneration!==generation)return;
+                    $('status').textContent=`Worker 실행 오류: ${event.message||'알 수 없는 오류'}`;
+                    stopWorker();
+                };
+                watchdog=setTimeout(()=>{
+                    if(currentGeneration!==generation)return;
+                    stopWorker();
+                    $('status').textContent='계산 시간 초과. 보드 크기나 조건을 확인해 주세요.';
+                },8000);
+                worker.postMessage({
+                    rows,
+                    cols,
+                    itemCount,
+                    state:[...state],
+                    limit:Number($('samples').value)||10000
+                });
+            }catch(error){
+                stopWorker();
+                $('status').textContent=`Worker 생성 오류: ${error.message}`;
+            }
+        }
+        $('resize').onclick=init;
+        $('items').onchange=init;
+        $('reset').onclick=()=>{
+            history.push([...state]);
+            state.fill(0);
+            render();
+            compute()
+        };
+        $('undo').onclick=()=>{
+            if(history.length){
+                state=history.pop();
+                render();
+                compute()
+            }
+        };
+        $('prob').onchange=()=>compute();
+        $('shapeChoice').onchange=()=>{};
+        $('samples').onchange=()=>compute();
+        init();
+    </script>
+    </body>
+</html>

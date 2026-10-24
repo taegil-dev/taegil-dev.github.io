@@ -1,0 +1,140 @@
+:root {
+    color-scheme: dark;
+    --bg: #111318;
+    --panel: #1b1e26;
+    --panel2: #232733;
+    --text: #edf0f7;
+    --muted: #a6adbd;
+    --accent: #9b8cff;
+    --border: #363b49;
+    --good: #75d6a5;
+    --warn: #ffcb78;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+body{
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-family:system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    margin:0;
+    padding:25px
+}
+.wrap{
+    width: 45%;
+}
+.rightbar {
+    width: 10%;
+    height: 10%;
+    margin-top: 13% !important;
+}
+.rightbar label {
+    flex-direction: column;
+}
+h1{
+    font-size:25px
+}
+.panel{
+    background:var(--panel);
+    border-radius:15px;
+    padding:18px;
+    margin:15px 0
+}
+button,select,input{
+    font:inherit
+}
+button{
+    cursor:pointer;
+    border:0;
+    border-radius:7px;
+    padding:9px 12px;
+    background:var(--panel2);
+    color:white
+}
+button.active{
+    background:#447de0
+}
+.toolbar{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+.board{
+    display:grid;
+    gap:4px;
+    max-width:640px;
+    margin:18px auto
+}
+.cell{
+    aspect-ratio:1;
+    padding:0;
+    min-width:0;
+    border:2px solid transparent;
+    border-radius:5px;
+    background:var(--panel2);
+    font-weight:700;
+    position:relative;
+    border-color: #5b6274;
+}
+.cell.hit{
+    background:var(--good)
+}
+.cell.hit-vertical { background:var(--accent); }
+.cell.hit-square { background:var(--border); }
+select { 
+    background:var(--panel2); 
+    color:#fff; 
+    border-radius:6px; 
+    padding:8px; 
+    border-color:var(--border);
+}
+.cell.miss{
+    background:#242e3e;
+    color:#8693a7
+}
+.cell.best{
+    border-color:#ffce66
+}
+.cell small{
+    font-size:clamp(9px,1.6vw,14px)
+}
+.muted{
+    color:#aab8cd;
+    font-size:13px
+}
+.stats{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap
+}
+.stats b{
+    color:#ffce66
+}
+label{
+    display:inline-flex;
+    gap:5px;
+    align-items:center
+}
+input[type=number]{
+    width:12%;
+    background:var(--panel2);
+    color:white;
+    border:1px solid var(--border);
+    padding:8px;
+    border-radius:6px;
+}
+#items{
+    width:20%;
+}
+.warning{
+    color:#ffce66
+}
+.legend{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap
+}
