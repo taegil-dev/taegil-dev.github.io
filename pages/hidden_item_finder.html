@@ -1,368 +1,903 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
     <head>
-        <meta charset="utf-8"/>
-        <meta content="width=device-width,initial-scale=1" name="viewport"/>
-        <link href="hidden_item_finder.css" rel="stylesheet"/>
-        <title>
-            발굴 탐색기
-        </title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="hex_merge_advisor.css" />
+        <title>유물 공방 배치 추천기</title>
     </head>
     <body oncontextmenu="return false">
-        <div class="wrap">
-            <h1>
-                발굴 탐색기
-            </h1>
-            <p class="muted">
-                발견 시 모양만 선택 · 아이템 개수 설정 가능 · 가로 4칸 / 세로 4칸 / 2×2 · 겹침 불가 · 인접 가능
-            </p>
-            <div class="panel toolbar" style="flex-direction:column;gap:16px">
-                <div>
-                    <label>
-                        크기
-                        <input id="rows" max="16" min="2" type="number" value="8"/>
-                        행 × 열
-                        <input id="cols" max="16" min="2" type="number" value="8"/>
-                    </label>
-                    <label>
-                        화석 개수
-                        <input id="items" max="64" min="1" type="number" value="5"/>
-                    </label>
-                </div>
-                <div style="display:flex;">
-                    <button id="resize">
-                        새 보드
-                    </button>
-                    <button id="undo">
-                        되돌리기
-                    </button>
-                    <button id="reset">
-                        초기화
-                    </button>
-                    <label>
-                        <input checked="" id="prob" type="checkbox"/>
-                        확률 표시
-                    </label>
-                    <div style="flex-grow:1"></div>
-                    <label>
-                        최대 표본 시도 기준
-                        <select id="samples">
-                            <option value="10000">
-                                10,000
-                            </option>
-                            <option selected="" value="30000">
-                                30,000
-                            </option>
-                            <option value="100000">
-                                100,000
-                            </option>
-                        </select>
-                    </label>
-                </div>
+        <main>
+            <h1>유물 공방 배치 추천기</h1>
+            <div class="layout">
+                <section>
+                    <div class="panel">
+                        <h2>1. 현재 보드 입력</h2>
+                        <p class="hint">
+                            칸을 클릭해 빈칸 → 레벨 1 → 레벨 2 … 순서로
+                            바꾸세요. 화면의 보드와 같게 입력하면 됩니다.
+                        </p>
+                        <svg
+                            id="board"
+                            viewBox="0 0 390 420"
+                            aria-label="육각형 보드"
+                        ></svg>
+                        <div class="legend" id="legend"></div>
+                        <div class="controls" style="margin-top: 12px">
+                            <button id="clearBoard">보드 초기화</button
+                            ><button id="demoBoard">예시 보드</button
+                            ><button id="undo">직전 배치 되돌리기</button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h2>2. 놓을 블록 입력</h2>
+                        <p class="hint">
+                            육각형 칸의 레벨을 지정하세요.
+                            회전은 추천 계산에서 자동으로 고려합니다.
+                        </p>
+                        <div id="pieceLevels" class="pieceCells"></div>
+                        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #596273;">
+                            <h3 style="margin:0 0 8px">다음 블록 (2수 앞 탐색)</h3>
+                            <div id="nextPieceLevels"></div>
+                            <div id="nextMovePreview" style="margin-top:12px;color:#dbe5f5;line-height:1.7"></div>
+                        </div>
+                        <div class="controls">
+                            <button id="recommend" class="primary">
+                                최선의 배치 찾기
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <aside>
+                    <div class="panel">
+                        <h2>추천 결과</h2>
+                        <p id="status" class="hint">
+                            보드와 현재 블록을 입력한 뒤 ‘최선의 배치 찾기’를
+                            누르세요.
+                        </p>
+                        <div id="bestSummary"></div>
+                        <div id="results"></div>
+                        <div class="controls" style="margin-top: 12px">
+                            <button id="applyBest" class="primary" disabled>
+                                추천 배치 적용</button
+                            ><button id="clearHighlight">
+                                추천 표시 지우기
+                            </button>
+                        </div>
+                        <div class="footer">
+                            추천 위치는 보드에서 흰색 테두리로, 블록이 차지할
+                            칸은 초록색 점선으로 표시됩니다.
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h2>평가 기준</h2>
+                        <p class="hint">
+                            현재 버전은 규칙 기반 휴리스틱으로 빈칸, 다음 블록
+                            수용 가능성, 병합 기회와 고립된 빈칸을 함께
+                            평가합니다. 절대적인 최적해를 보장하지는 않습니다.
+                        </p>
+                        <div class="stats">
+                            <div class="stat">
+                                <b id="emptyCount">23</b><span>현재 빈칸</span>
+                            </div>
+                            <div class="stat">
+                                <b id="fitCount">—</b
+                                ><span>현재 블록 배치 수</span>
+                            </div>
+                            <div class="stat">
+                                <b id="mergeCount">—</b
+                                ><span>추천 병합 수</span>
+                            </div>
+                        </div>
+                        <details>
+                            <summary>가정 및 주의사항</summary>
+                            <p class="hint">
+                                프로토타입은 각 칸에 레벨이 있고, 같은 레벨의
+                                연결된 칸이 3개 이상이면 그 연결 집단이 한 칸의
+                                상위 레벨로 합쳐진다고 가정합니다. 병합 시 남는
+                                칸은 새 블록이 놓인 칸을 우선으로 선택합니다.
+                                실제 게임의 병합 처리 방식이 다르면 추천 결과도
+                                달라질 수 있습니다. 화면 자동 인식 기능은
+                                포함하지 않았으므로 보드 상태를 직접 입력해야
+                                합니다.
+                            </p>
+                        </details>
+                    </div>
+                </aside>
             </div>
-            <div class="panel">
-                <div class="stats">
-                    <span>
-                        발견한 칸
-                        <b id="hits">
-                            0
-                        </b>
-                        / <b id="target">3</b>
-                    </span>
-                    <span>
-                        빈칸
-                        <b id="misses">
-                            0
-                        </b>
-                    </span>
-                    <span>
-                        추천
-                        <b id="best">
-                            -
-                        </b>
-                    </span>
-                    <span>
-                        추정 확률
-                        <b id="chance">
-                            -
-                        </b>
-                    </span>
-                </div>
-                <div class="board" id="board">
-                </div>
-                <div class="legend muted">
-                    <span>
-                        초록색: 가로 발견 · 청록색: 세로 발견 · 보라색: 2×2 발견 · ×: 빈칸
-                    </span>
-                    <span>
-                        노란 테두리: 추천
-                    </span>
-                </div>
-                <p class="muted" id="status">
-                </p>
-            </div>
-            <p class="muted">
-                가능한 조합이 적으면 정확 계산, 많으면 시간 제한(약 1.4초)이 있는 조건부 표본 계산을 사용합니다. 조건부 표본 계산은 편향될 수 있으며 표본이 부족하면 결과가 불안정할 수 있습니다. 가능한 최종 배치가 동일 확률이라는 가정입니다. 발견 칸의 모양은 알 수 있지만 파츠 번호는 사용하지 않습니다. 발견한 아이템의 네 칸은 직접 표시해야 합니다.
-            </p>
-        </div>
-         <div class="panel toolbar rightbar">
-            <label>발견할 화석 모양
-                <select id="shapeChoice">
-                    <option value="1">가로 4칸 (1×4)</option>
-                    <option value="2">세로 4칸 (4×1)</option>
-                    <option value="3">정사각형 (2×2)</option>
-                </select>
-            </label>
-            <span class="muted">클릭: 선택한 모양으로 발견 → 없음 → 초기화 (우클릭 시 바로 초기화)</span>
-        </div>
+        </main>
         <script>
-        let rows=8,cols=8,itemCount=3,state=[],history=[],generation=0;
-        // 0 = 미확인, 1 = 가로 발견, 2 = 세로 발견, 3 = 2x2 발견, 4 = 빈칸
-        const $ = id => document.getElementById(id);
-        let worker = null;
-        function init() {
-            rows = Math.max(2, Math.min(16, Math.floor(Number($('rows').value) || 8)));
-            cols = Math.max(2, Math.min(16, Math.floor(Number($('cols').value) || 8)));
-            itemCount = Math.max(1, Math.min(Math.floor(rows * cols / 4), Math.floor(Number($('items').value) || 3)));
-            $('rows').value = rows;
-            $('cols').value = cols;
-            $('items').max = Math.floor(rows * cols / 4);
-            $('items').value = itemCount;
-            $('target').textContent = itemCount * 4;
-            state = Array(rows * cols).fill(0);
-            history = [];
-            render();
-            compute();
-        }
-        function render(probs = [], best = -1) {
-            const board = $('board');
-            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-            board.innerHTML = '';
-            state.forEach((v, i) => {
-                const b = document.createElement('button');
-                b.className = 'cell ' + (v >= 1 && v <= 3 ? 'hit' + (v === 2 ? ' hit-vertical' : v === 3 ? ' hit-square' : '') : v === 4 ? 'miss' : '') + (i === best && v === 0 ? ' best' : '');
-                b.title = `${Math.floor(i / cols) + 1}행 ${i % cols + 1}열`;
-                b.textContent = v >= 1 && v <= 3 ? ['','가','세','정'][v] : v === 4 ? '×' : $('prob').checked && probs[i] != null ? `${(probs[i] * 100).toFixed(1)}%` : '';
-                b.onclick = () => {
-                    history.push([...state]);
-                    state[i] = state[i] === 0 ? Number($('shapeChoice').value) : state[i] === 4 ? 0 : 4;
-                    render();
-                    compute();
-                };
-                b.oncontextmenu = e => {
-                    e.preventDefault();
-                    if (state[i] === 0) return;
-                    history.push([...state]);
-                    state[i] = 0;
-                    render();
-                    compute();
-                };
-                board.appendChild(b);
-            });
-            $('hits').textContent = state.filter(v => v >= 1 && v <= 3).length;
-            $('misses').textContent = state.filter(v => v === 4).length;
-            $('best').textContent = best < 0 ? '-' : `${Math.floor(best / cols) + 1}행 ${best % cols + 1}열`;
-            $('chance').textContent = best < 0 || probs[best] == null ? '-' : `${(probs[best] * 100).toFixed(1)}%`;
-        }
-        // Web Worker prevents UI blocking.
-        const workerCode = `
-        onmessage = e => {
-            const {rows, cols, itemCount, state, limit} = e.data;
-            const N = rows * cols;
-            const bit = Array.from({length: N}, (_, i) => 1n << BigInt(i));
-            const hits = [];
-            let hitMask = 0n;
-            for (let i = 0; i < N; i++) if (state[i] >= 1 && state[i] <= 3) {
-                hits.push(i);
-                hitMask |= bit[i];
+            const rows = [5, 4, 5, 4, 5],
+                R = 5;
+            const colors = {
+                0: "#2a2f3b",
+                1: "#59a9ff",
+                2: "#68d391",
+                3: "#f6c85f",
+                4: "#f08a5d",
+                5: "#d17bff",
+                6: "#ff6b8a",
+                7: "#f3f4f6",
+                8: "#7ce7df",
+                9: "#ffb86c",
+                10: "#c3a6ff",
+            };
+            let cells = [],
+                board = {},
+                currentShape = "custom",
+                pieceLevels = [],
+                recommendation = null,
+                undoBoard = null,
+                pieceBoard = {},
+                nextPieceBoard = {},
+                nextPieceLevels = [];
+            const shapes = {
+                single: [[0, 0]],
+                domino: [
+                    [0, 0],
+                    [1, 0],
+                ],
+                line3: [
+                    [0, 0],
+                    [1, 0],
+                    [2, 0],
+                ],
+                bend3: [
+                    [0, 0],
+                    [1, 0],
+                    [0, 1],
+                ],
+                custom: [[0, 0]],
+            };
+            function key(q, r) {
+                return q + "," + r;
             }
-            if (hits.length > itemCount * 4) {
-                postMessage({error: '발견 칸이 아이템 전체 칸 수를 초과합니다.'});
-                return;
+            function parse(k) {
+                return k.split(",").map(Number);
             }
-            const shapes = [
-                [[0,0],[0,1],[0,2],[0,3]],
-                [[0,0],[1,0],[2,0],[3,0]],
-                [[0,0],[0,1],[1,0],[1,1]]
+            for (let r = 0; r < R; r++)
+                for (let c = 0; c < rows[r]; c++) {
+                    let q = c - Math.floor(r / 2);
+                    cells.push({
+                        q,
+                        r,
+                        k: key(q, r),
+                        x: 333 - (38 + r * 50),
+                        y: 24 + (70 + (q + r / 2) * 58),
+                    });
+                    board[key(q, r)] = 0;
+                }
+            const cellSet = new Set(cells.map((c) => c.k));
+            const dirs = [
+                [1, 0],
+                [-1, 0],
+                [0, 1],
+                [0, -1],
+                [1, -1],
+                [-1, 1],
             ];
-            const placements = [];
-            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-                for (let shapeIndex = 0; shapeIndex < shapes.length; shapeIndex++) {
-                    const shape = shapes[shapeIndex];
-                    if (shape.some(([dr,dc]) => r + dr >= rows || c + dc >= cols)) continue;
-                    const ids = shape.map(([dr,dc]) => (r + dr) * cols + c + dc);
-                    if (ids.some(id => state[id] === 4)) continue;
-                    const shapeType = shapeIndex + 1;
-                    if (ids.some(id => state[id] >= 1 && state[id] <= 3 && state[id] !== shapeType)) continue;
-                    const mask = ids.reduce((m,id) => m | bit[id], 0n);
-                    placements.push({mask, hit: mask & hitMask, shapeType});
+            function neighbors(k) {
+                let [q, r] = parse(k);
+                return dirs
+                    .map(([dq, dr]) => key(q + dq, r + dr))
+                    .filter((n) => cellSet.has(n));
+            }
+            function polyPoints(cx, cy, s) {
+                let a = [];
+                for (let i = 0; i < 6; i++) {
+                    let ang = (Math.PI / 180) * (60 * i + 60);
+                    a.push(
+                        (cx + s * Math.cos(ang)).toFixed(1) +
+                            "," +
+                            (cy + s * Math.sin(ang)).toFixed(1),
+                    );
                 }
+                return a.join(" ");
             }
-            const P = placements.length;
-            const counts = new Float64Array(N);
-            let total = 0, nodes = 0, truncated = false, exact = false, attempts = 0;
-            const deadline = Date.now() + 1300;
-            const maxNodes = Math.max(15000, Math.min(350000, limit * 5));
-            const hitCandidates = hits.map(id => placements.map((p,i) => ((p.mask & bit[id]) && p.shapeType === state[id]) ? i : -1).filter(i => i >= 0));
-            if (hitCandidates.some(a => a.length === 0) || P < itemCount) {
-                postMessage({error: '현재 발견/빈칸 조건에 맞는 배치가 없습니다.'});
-                return;
-            }
-            function record(mask) {
-                if ((mask & hitMask) !== hitMask) return;
-                total++;
-                for (let i = 0; i < N; i++) if (state[i] === 0 && (mask & bit[i])) counts[i]++;
-            }
-            function visit(start, depth, mask) {
-                if (++nodes > maxNodes || Date.now() > deadline) { truncated = true; return; }
-                if (depth === itemCount) { record(mask); return; }
-                for (let i = start; i <= P - (itemCount - depth); i++) {
-                    if (truncated) return;
-                    if (!(mask & placements[i].mask)) visit(i + 1, depth + 1, mask | placements[i].mask);
-                }
-            }
-            function combinations(n, k) {
-                let v = 1;
-                for (let i = 1; i <= k; i++) {
-                    v = v * (n - i + 1) / i;
-                    if (v > 120000) return v;
-                }
-                return v;
-            }
-            if (combinations(P, itemCount) <= 120000) {
-                visit(0, 0, 0n);
-                exact = !truncated;
-            }
-            if (!exact) {
-                counts.fill(0);
-                total = 0;
-                nodes = 0;
-                function sample(mask, depth, covered) {
-                    if (++nodes > maxNodes || Date.now() > deadline) return false;
-                    if (depth === itemCount) {
-                        if (covered === hitMask) { record(mask); return true; }
-                        return false;
+            function drawBoard(highlight = [], preview = [], highlightLevels = []) {
+                let svg = document.querySelector("#board");
+                svg.innerHTML = "";
+                cells.forEach((c) => {
+                    let v = board[c.k] || 0;
+                    let p = document.createElementNS(
+                        "http://www.w3.org/2000/svg",
+                        "polygon",
+                    );
+                    p.setAttribute("points", polyPoints(c.x, c.y, 27));
+                    p.setAttribute(
+                        "class",
+                        "cell " +
+                            (v ? "" : "empty") +
+                            (highlight.includes(c.k) ? " recommended" : "") +
+                            (preview.includes(c.k) ? " preview" : ""),
+                    );
+                    p.setAttribute(
+                        "fill",
+                        v ? colors[v] || "#ffffff" : "#2a2f3b",
+                    );
+                    p.addEventListener("click", () => {
+                        undoBoard = { ...board };
+                        board[c.k] = (board[c.k] + 1) % 11;
+                        recommendation = null;
+                        drawBoard();
+                        updateStats();
+                    });
+                    svg.appendChild(p);
+                    // 기존 레벨 숫자는 그대로 표시하고, 추천 위치가 빈칸이면
+                    // 해당 위치에 놓일 블록의 레벨 숫자도 함께 표시한다.
+                    if (v || highlight.includes(c.k)) {
+                        let t = document.createElementNS(
+                            "http://www.w3.org/2000/svg",
+                            "text",
+                        );
+                        t.setAttribute("x", c.x);
+                        t.setAttribute("y", c.y);
+                        t.setAttribute("class", "celltext " + (highlight.includes(c.k) && "celltext-recommended"));
+                        const highlightIndex = highlight.indexOf(c.k);
+                        t.textContent = v || highlightLevels[highlightIndex] || "";
+                        svg.appendChild(t);
                     }
-                    let choices = null;
-                    for (let h = 0; h < hits.length; h++) {
-                        if (covered & bit[hits[h]]) continue;
-                        const opts = hitCandidates[h].filter(i => !(placements[i].mask & mask));
-                        if (!opts.length) return false;
-                        if (choices === null || opts.length < choices.length) choices = opts;
-                    }
-                    if (choices === null) {
-                        choices = [];
-                        for (let i = 0; i < P; i++) if (!(placements[i].mask & mask)) choices.push(i);
-                    }
-                    const tries = Math.min(choices.length, Math.max(5, Math.floor(35 / (depth + 1))));
-                    for (let t = 0; t < tries; t++) {
-                        const j = t + Math.floor(Math.random() * (choices.length - t));
-                        [choices[t], choices[j]] = [choices[j], choices[t]];
-                        const p = placements[choices[t]];
-                        if (sample(mask | p.mask, depth + 1, covered | p.hit)) return true;
-                    }
-                    return false;
-                }
-                while (attempts < limit && nodes < maxNodes && Date.now() < deadline) {
-                    attempts++;
-                    sample(0n, 0, 0n);
-                }
-            }
-            const probs = Array.from(counts, x => total ? x / total : null);
-            let best = -1;
-            for (let i = 0; i < N; i++) {
-                if (state[i] === 0 && probs[i] !== null && (best < 0 || probs[i] > probs[best])) best = i;
-            }
-            postMessage({probs, best, total, exact, P, attempts, remaining: itemCount});
-        };
-        `;
-        let watchdog=null;
-        let workerUrl=null;
-
-        function stopWorker(){
-            if(watchdog!==null){
-                clearTimeout(watchdog);
-                watchdog=null;
-            }
-            if(worker){
-                worker.terminate();
-                worker=null;
-            }
-            if(workerUrl){
-                URL.revokeObjectURL(workerUrl);
-                workerUrl=null;
-            }
-        }
-
-        function compute(){
-            generation++;
-            const currentGeneration=generation;
-            stopWorker();
-            if (state.filter(v => v >= 1 && v <= 3).length === itemCount * 4) {
-                render();
-                $('status').textContent = '모든 아이템 칸을 발견했습니다.';
-                return;
-            }
-            $('status').textContent='가능한 배치를 계산 중...';
-
-            try{
-                workerUrl=URL.createObjectURL(new Blob([workerCode],{
-                    type:'text/javascript'
-                }));
-                worker=new Worker(workerUrl);
-                worker.onmessage=(event)=>{
-                    if(currentGeneration!==generation)return;
-                    const {probs,best,total,exact,P,attempts,error,remaining}=event.data;
-                    stopWorker();
-                    render(probs,best);
-                    if(error){$('status').textContent=error;return;}
-                    $('status').textContent=total===0
-                        ? exact ? '조건에 맞는 배치가 없습니다. 입력 상태를 확인하세요.' : '조건에 맞는 표본을 찾지 못했습니다. 표본 시도를 늘리거나 입력 상태를 확인하세요.'
-                        : exact
-                            ? `정확 계산: 유효한 ${remaining}개 아이템 조합 ${total.toLocaleString()}개 (단일 아이템 후보 ${P}개)`
-                            : `근사 계산: 유효 표본 ${total.toLocaleString()}개, 시도 ${attempts.toLocaleString()}회. 조건부 탐색 근사값으로 편향될 수 있습니다.`;
-                };
-                worker.onerror=(event)=>{
-                    if(currentGeneration!==generation)return;
-                    $('status').textContent=`Worker 실행 오류: ${event.message||'알 수 없는 오류'}`;
-                    stopWorker();
-                };
-                watchdog=setTimeout(()=>{
-                    if(currentGeneration!==generation)return;
-                    stopWorker();
-                    $('status').textContent='계산 시간 초과. 보드 크기나 조건을 확인해 주세요.';
-                },8000);
-                worker.postMessage({
-                    rows,
-                    cols,
-                    itemCount,
-                    state:[...state],
-                    limit:Number($('samples').value)||10000
                 });
-            }catch(error){
-                stopWorker();
-                $('status').textContent=`Worker 생성 오류: ${error.message}`;
+                document.querySelector("#emptyCount").textContent =
+                    cells.filter((c) => !board[c.k]).length;
             }
-        }
-        $('resize').onclick=init;
-        $('items').onchange=init;
-        $('reset').onclick=()=>{
-            history.push([...state]);
-            state.fill(0);
-            render();
-            compute()
-        };
-        $('undo').onclick=()=>{
-            if(history.length){
-                state=history.pop();
-                render();
-                compute()
+            function drawLegend() {
+                let el = document.querySelector("#legend");
+                el.innerHTML = "";
+                for (let i = 1; i <= 10; i++) {
+                    let s = document.createElement("span");
+                    s.className = "swatch";
+                    s.style.background = colors[i];
+                    s.textContent = "레벨 " + i;
+                    el.appendChild(s);
+                }
             }
-        };
-        $('prob').onchange=()=>compute();
-        $('shapeChoice').onchange=()=>{};
-        $('samples').onchange=()=>compute();
-        init();
-    </script>
+            function renderPieceLevels() {
+                // 전용 미니 보드에서 블록의 모양과 각 칸의 레벨을 직접 입력한다.
+                const el = document.querySelector("#pieceLevels");
+                el.innerHTML = "";
+
+                const title = document.createElement("div");
+                title.style.cssText = "width:100%;margin-bottom:8px;font-size:13px;color:#aeb8ca;";
+                el.appendChild(title);
+
+                const miniCells = [];
+                const miniRows = [3, 2, 3];
+                for (let r = 0; r < miniRows.length; r++) {
+                    for (let c = 0; c < miniRows[r]; c++) {
+                        const q = c - Math.floor(r / 2);
+                        miniCells.push({ q, r, k: key(q, r), x: 190 - (34 + r * 47), y: 50 + (q + r / 2) * 54 });
+                    }
+                }
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute("viewBox", "0 0 200 200");
+                svg.setAttribute("width", "200");
+                svg.setAttribute("height", "200");
+                svg.style.cssText = "display:block;max-width:100%;overflow:visible;";
+
+                const selected = Object.entries(pieceBoard)
+                    .filter(([, level]) => level > 0)
+                    .map(([k, level]) => ({ k, level, coords: parse(k) }));
+
+                miniCells.forEach((c) => {
+                    const level = pieceBoard[c.k] || 0;
+                    const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    polygon.setAttribute("points", polyPoints(c.x, c.y, 23));
+                    polygon.setAttribute("fill", level ? colors[level] : "#2a2f3b");
+                    polygon.setAttribute("stroke", level ? "#dbe5f5" : "#596273");
+                    polygon.setAttribute("stroke-width", "1.5");
+                    polygon.style.cursor = "pointer";
+                    polygon.addEventListener("click", () => {
+                        const current = pieceBoard[c.k] || 0;
+                        if (current === 0) {
+                            if (selected.length >= 3) {
+                                document.querySelector("#status").textContent = "블록은 최대 3칸까지 입력할 수 있습니다.";
+                                return;
+                            }
+                            if (selected.length > 0) {
+                                const adjacent = selected.some(({ coords }) => {
+                                    const [sq, sr] = coords;
+                                    return neighbors(key(sq, sr)).includes(c.k);
+                                });
+                                if (!adjacent) {
+                                    document.querySelector("#status").textContent = "블록의 새 칸은 기존 블록과 붙어 있어야 합니다.";
+                                    return;
+                                }
+                            }
+                            pieceBoard[c.k] = 1;
+                        } else if (current < 10) {
+                            pieceBoard[c.k] = current + 1;
+                        } else {
+                            const remaining = selected.filter(item => item.k !== c.k);
+                            if (remaining.length > 0 && !isConnectedPiece(remaining)) {
+                                document.querySelector("#status").textContent = "가운데 칸을 제거하면 블록이 분리되므로 먼저 바깥 칸을 제거하세요.";
+                                return;
+                            }
+                            delete pieceBoard[c.k];
+                        }
+                        syncPieceFromBoard();
+                        recommendation = null;
+                        renderPieceLevels();
+                    });
+                    svg.appendChild(polygon);
+
+                    if (level > 0) {
+                        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        label.setAttribute("x", c.x);
+                        label.setAttribute("y", c.y + 5);
+                        label.setAttribute("text-anchor", "middle");
+                        label.setAttribute("font-size", "14");
+                        label.setAttribute("font-weight", "700");
+                        label.setAttribute("fill", "#18202c");
+                        label.style.pointerEvents = "none";
+                        label.textContent = String(level);
+                        svg.appendChild(label);
+                    }
+                });
+                el.appendChild(svg);
+
+                const resetButton = document.createElement("button");
+                resetButton.type = "button";
+                resetButton.textContent = "블록 보드 초기화";
+                resetButton.style.cssText = "display:block;margin-top:10px;padding:8px 12px;border:1px solid #596273;border-radius:8px;background:#252b37;color:#f3f4f6;cursor:pointer;z-index: 1;";
+                resetButton.addEventListener("click", () => {
+                    pieceBoard = {};
+                    syncPieceFromBoard();
+                    recommendation = null;
+                    renderPieceLevels();
+                    document.querySelector("#status").textContent = "놓을 블록 보드를 초기화했습니다.";
+                });
+                el.appendChild(resetButton);
+            }
+
+            function renderNextPieceLevels() {
+                // 전용 미니 보드에서 블록의 모양과 각 칸의 레벨을 직접 입력한다.
+                const el = document.querySelector("#nextPieceLevels");
+                el.innerHTML = "";
+
+                const title = document.createElement("div");
+                title.style.cssText = "width:100%;margin-bottom:8px;font-size:13px;color:#aeb8ca;";
+                el.appendChild(title);
+
+                const miniCells = [];
+                const miniRows = [3, 2, 3];
+                for (let r = 0; r < miniRows.length; r++) {
+                    for (let c = 0; c < miniRows[r]; c++) {
+                        const q = c - Math.floor(r / 2);
+                        miniCells.push({ q, r, k: key(q, r), x: 190 - (34 + r * 47), y: 70 + (q + r / 2) * 54 });
+                    }
+                }
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute("viewBox", "0 0 200 200");
+                svg.setAttribute("width", "200");
+                svg.setAttribute("height", "200");
+                svg.style.cssText = "display:block;max-width:100%;overflow:visible;";
+
+                const selected = Object.entries(nextPieceBoard)
+                    .filter(([, level]) => level > 0)
+                    .map(([k, level]) => ({ k, level, coords: parse(k) }));
+
+                miniCells.forEach((c) => {
+                    const level = nextPieceBoard[c.k] || 0;
+                    const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    polygon.setAttribute("points", polyPoints(c.x, c.y, 23));
+                    polygon.setAttribute("fill", level ? colors[level] : "#2a2f3b");
+                    polygon.setAttribute("stroke", level ? "#dbe5f5" : "#596273");
+                    polygon.setAttribute("stroke-width", "1.5");
+                    polygon.style.cursor = "pointer";
+                    polygon.addEventListener("click", () => {
+                        const current = nextPieceBoard[c.k] || 0;
+                        if (current === 0) {
+                            if (selected.length >= 3) {
+                                document.querySelector("#status").textContent = "블록은 최대 3칸까지 입력할 수 있습니다.";
+                                return;
+                            }
+                            if (selected.length > 0) {
+                                const adjacent = selected.some(({ coords }) => {
+                                    const [sq, sr] = coords;
+                                    return neighbors(key(sq, sr)).includes(c.k);
+                                });
+                                if (!adjacent) {
+                                    document.querySelector("#status").textContent = "블록의 새 칸은 기존 블록과 붙어 있어야 합니다.";
+                                    return;
+                                }
+                            }
+                            nextPieceBoard[c.k] = 1;
+                        } else if (current < 10) {
+                            nextPieceBoard[c.k] = current + 1;
+                        } else {
+                            const remaining = selected.filter(item => item.k !== c.k);
+                            if (remaining.length > 0 && !isConnectedPiece(remaining)) {
+                                document.querySelector("#status").textContent = "가운데 칸을 제거하면 블록이 분리되므로 먼저 바깥 칸을 제거하세요.";
+                                return;
+                            }
+                            delete nextPieceBoard[c.k];
+                        }
+                        syncNextPieceFromBoard();
+                        recommendation = null;
+                        renderNextPieceLevels();
+                    });
+                    svg.appendChild(polygon);
+
+                    if (level > 0) {
+                        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        label.setAttribute("x", c.x);
+                        label.setAttribute("y", c.y + 5);
+                        label.setAttribute("text-anchor", "middle");
+                        label.setAttribute("font-size", "14");
+                        label.setAttribute("font-weight", "700");
+                        label.setAttribute("fill", "#18202c");
+                        label.style.pointerEvents = "none";
+                        label.textContent = String(level);
+                        svg.appendChild(label);
+                    }
+                });
+                el.appendChild(svg);
+
+                const resetButton = document.createElement("button");
+                resetButton.type = "button";
+                resetButton.textContent = "블록 보드 초기화";
+                resetButton.style.cssText = "display:block;margin-top:10px;padding:8px 12px;border:1px solid #596273;border-radius:8px;background:#252b37;color:#f3f4f6;cursor:pointer;z-index: 1;";
+                resetButton.addEventListener("click", () => {
+                    nextPieceBoard = {};
+                    syncNextPieceFromBoard();
+                    recommendation = null;
+                    renderNextPieceLevels();
+                    document.querySelector("#status").textContent = "다음 블록 보드를 초기화했습니다.";
+                });
+                el.appendChild(resetButton);
+            }
+
+            function isConnectedPiece(items) {
+                if (items.length <= 1) return true;
+                const remaining = new Set(items.map(item => item.k));
+                const visited = new Set();
+                const stack = [items[0].k];
+                while (stack.length) {
+                    const k = stack.pop();
+                    if (visited.has(k)) continue;
+                    visited.add(k);
+                    neighbors(k).forEach(n => {
+                        if (remaining.has(n) && !visited.has(n)) stack.push(n);
+                    });
+                }
+                return visited.size === remaining.size;
+            }
+
+            function syncPieceFromBoard() {
+                const chosen = Object.entries(pieceBoard)
+                    .filter(([, level]) => level > 0)
+                    .map(([k, level]) => ({ coords: parse(k), level }));
+                if (!chosen.length) {
+                    shapes.custom = [];
+                    pieceLevels = [];
+                    currentShape = "custom";
+                    return;
+                }
+                const minQ = Math.min(...chosen.map(item => item.coords[0]));
+                const minR = Math.min(...chosen.map(item => item.coords[1]));
+                shapes.custom = chosen.map(item => [item.coords[0] - minQ, item.coords[1] - minR]);
+                pieceLevels = chosen.map(item => item.level);
+                currentShape = "custom";
+            }
+            function syncNextPieceFromBoard() {
+                const chosen = Object.entries(nextPieceBoard)
+                    .filter(([, level]) => level > 0)
+                    .map(([k, level]) => ({ coords: parse(k), level }));
+                if (!chosen.length) {
+                    shapes.nextCustom = [];
+                    nextPieceLevels = [];
+                    return;
+                }
+                const minQ = Math.min(...chosen.map(item => item.coords[0]));
+                const minR = Math.min(...chosen.map(item => item.coords[1]));
+                shapes.nextCustom = chosen.map(item => [item.coords[0] - minQ, item.coords[1] - minR]);
+                nextPieceLevels = chosen.map(item => item.level);
+            }
+            // 두 번째 블록까지 실제로 놓아 본 뒤 가장 좋은 후속 수를 고른다.
+            function scoreTwoMoves(first) {
+                if (!nextPieceLevels.length) {
+                    return { score: scoreState(first.board, first.merges, currentShape, "unknown"), next: null, count: 0 };
+                }
+                const options = placements(first.board, "nextCustom", nextPieceLevels);
+                if (!options.length) {
+                    return { score: scoreState(first.board, first.merges, currentShape, "unknown") - 180,
+                        next: null, count: 0 };
+                }
+                let best = null, bestScore = -Infinity;
+                for (const p of options) {
+                    const value = scoreState(p.board, first.merges + p.merges, "nextCustom", "unknown");
+                    if (value > bestScore) { bestScore = value; best = p; }
+                }
+                return { score: bestScore, next: best, count: options.length };
+            }
+            function rotate([q, r]) {
+                return [-r, q + r];
+            }
+            function orientations(shape) {
+                let base = shapes[shape],
+                    out = [],
+                    seen = new Set();
+                for (let rot = 0; rot < 6; rot++) {
+                    let coords = base.map(([q, r]) => {
+                        let x = q,
+                            y = r;
+                        for (let i = 0; i < rot; i++) [x, y] = rotate([x, y]);
+                        return [x, y];
+                    });
+                    let minq = Math.min(...coords.map((p) => p[0])),
+                        minr = Math.min(...coords.map((p) => p[1]));
+                    coords = coords.map(([q, r]) => [q - minq, r - minr]);
+                    let order = coords.map((p) => p.join(",")).sort();
+                    let sig = order.join(";");
+                    if (!seen.has(sig)) {
+                        seen.add(sig);
+                        out.push(coords);
+                    }
+                }
+                return out;
+            }
+            function comps(b) {
+                let seen = new Set(),
+                    result = [];
+                for (let c of cells) {
+                    let k = c.k;
+                    if (!b[k] || seen.has(k)) continue;
+                    let level = b[k],
+                        stack = [k],
+                        comp = [];
+                    seen.add(k);
+                    while (stack.length) {
+                        let x = stack.pop();
+                        comp.push(x);
+                        for (let n of neighbors(x))
+                            if (!seen.has(n) && b[n] === level) {
+                                seen.add(n);
+                                stack.push(n);
+                            }
+                    }
+                    result.push({ level, cells: comp });
+                }
+                return result;
+            }
+            // 같은 레벨이 3개 이상 연결되어도, 이번 수로 영향을 받은 그룹만 합성한다.
+            // 기존에 놓여 있던 독립 그룹이 갑자기 합쳐지는 것을 방지한다.
+            function connectedSameLevel(b, start) {
+                const level = b[start];
+                if (!level) return [];
+                const seen = new Set([start]);
+                const stack = [start];
+                while (stack.length) {
+                    const k = stack.pop();
+                    for (const n of neighbors(k)) {
+                        if (b[n] === level && !seen.has(n)) {
+                            seen.add(n);
+                            stack.push(n);
+                        }
+                    }
+                }
+                return [...seen];
+            }
+            // 합성은 세 조각을 전부 놓은 뒤 낮은 레벨부터 시작한다.
+            // 한 번 합성되어 생긴 블록은 후속 연쇄 합성에서도 같은 자리를 유지한다.
+            function simulatePlacement(b, placement, levels) {
+                const out = { ...b };
+                placement.forEach((k, i) => { out[k] = levels[i]; });
+                const active = new Set(placement);
+                const priority = [...placement].reverse();
+                // chainRoot: 해당 블록이 최초 합성으로 생긴 자리.
+                // 이후 같은 블록이 합성에 참가하면 최초 자리를 최우선으로 보존한다.
+                const chainRoot = new Map();
+                let merges = 0;
+                let safety = 0;
+                while (safety++ < 80) {
+                    const candidates = [];
+                    const visited = new Set();
+                    for (const origin of active) {
+                        if (!out[origin] || out[origin] >= 10 || visited.has(origin)) continue;
+                        const group = connectedSameLevel(out, origin);
+                        group.forEach(k => visited.add(k));
+                        if (group.length < 3) continue;
+                        const chainMembers = group.filter(k => chainRoot.has(k));
+                        // 연쇄 합성의 생존 위치는 이전 단계에서 생성된 블록의 자리.
+                        const survivor = chainMembers.length
+                            ? chainMembers.sort((x, y) => (chainRoot.get(x).order - chainRoot.get(y).order))[0]
+                            : (priority.find(k => group.includes(k)) || group.find(k => active.has(k)) || origin);
+                        candidates.push({ level: out[origin], group, survivor,
+                            chain: chainMembers.length > 0 });
+                    }
+                    if (!candidates.length) break;
+                    candidates.sort((x, y) => x.level - y.level ||
+                        Number(y.chain) - Number(x.chain) ||
+                        priority.indexOf(x.survivor) - priority.indexOf(y.survivor));
+                    const { level, group, survivor } = candidates[0];
+                    const prior = chainRoot.get(survivor);
+                    group.forEach(k => { out[k] = 0; active.delete(k); chainRoot.delete(k); });
+                    // 같은 레벨 5개 이상을 한 번에 합치면 두 단계 상승한다.
+                    // 3~4개는 한 단계 상승하며, 최대 레벨 10을 넘지 않는다.
+                    const levelGain = group.length >= 5 ? 2 : 1;
+                    out[survivor] = Math.min(10, level + levelGain);
+                    active.add(survivor);
+                    chainRoot.set(survivor, prior || { order: merges });
+                    merges++;
+                }
+                return { board: out, merges };
+            }
+            function placements(b, shape, levels) {
+                if (!shapes[shape] || !shapes[shape].length || !levels.length) return [];
+                let result = [],
+                    seen = new Set();
+                for (let ori of orientations(shape)) {
+                    for (let anchor of cells) {
+                        let pos = ori.map(([dq, dr]) =>
+                            key(anchor.q + dq, anchor.r + dr),
+                        );
+                        if (pos.every((k) => cellSet.has(k) && !b[k])) {
+                            let sig = pos.slice().sort().join("|");
+                            if (!seen.has(sig)) {
+                                seen.add(sig);
+                                let sim = simulatePlacement(b, pos, levels);
+                                result.push({ pos, ...sim });
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+            function countPlacements(b, shape) {
+                if (!shapes[shape] || !shapes[shape].length) return 0;
+                let n = 0;
+                for (let ori of orientations(shape))
+                    for (let anchor of cells) {
+                        let pos = ori.map(([dq, dr]) =>
+                            key(anchor.q + dq, anchor.r + dr),
+                        );
+                        if (pos.every((k) => cellSet.has(k) && !b[k])) n++;
+                    }
+                return n;
+            }
+            // 현재 보드의 최고 레벨만 사용한다. 과거 최고 레벨은 기록하지 않는다.
+            function currentMaxLevel(b) {
+                return Math.max(1, ...cells.map(c => b[c.k] || 0));
+            }
+            function minSpawnLevel(b) {
+                return Math.max(1, currentMaxLevel(b) - 3);
+            }
+            // 새로 등장할 수 없는 낮은 레벨 그룹을 평가한다.
+            // 연결된 블록이 3개 이상이면 자체 합성이 가능하므로 막힌 칸으로 세지 않는다.
+            function strandedInfo(b) {
+                const minLevel = minSpawnLevel(b);
+                let blockedCells = 0, blockedGroups = 0, endangeredPairs = 0;
+                for (const g of comps(b)) {
+                    if (g.level >= minLevel || g.cells.length >= 3) continue;
+                    blockedCells += g.cells.length;
+                    blockedGroups++;
+                    if (g.cells.length === 2) endangeredPairs++;
+                }
+                return { blockedCells, blockedGroups, endangeredPairs, minLevel };
+            }
+            function scoreState(b, merges, usedShape, nextShape) {
+                let empty = cells.filter((c) => !b[c.k]).length;
+                let compsNow = comps(b);
+                let near = 0,
+                    mergeReady = 0;
+                for (let g of compsNow) {
+                    if (g.cells.length === 2) mergeReady += 1;
+                    if (g.cells.length >= 3) near += g.cells.length;
+                }
+                let pairs = 0;
+                for (let c of cells) {
+                    if (!b[c.k]) continue;
+                    for (let n of neighbors(c.k))
+                        if (n > c.k && b[n] === b[c.k]) pairs++;
+                }
+                let isolated = 0,
+                    usable = 0;
+                for (let c of cells)
+                    if (!b[c.k]) {
+                        let ns = neighbors(c.k);
+                        if (ns.filter((n) => !b[n]).length === 0) isolated++;
+                        if (ns.filter((n) => !b[n]).length <= 1) usable++;
+                    }
+                let mobility =
+                    countPlacements(b, "single") +
+                    countPlacements(b, "domino") +
+                    countPlacements(b, "line3") +
+                    countPlacements(b, "bend3");
+                let nextMob = 0; // 다음 블록은 scoreTwoMoves에서 직접 시뮬레이션
+                const stranded = strandedInfo(b);
+                return (
+                    empty * 8 +
+                    mobility * 0.16 +
+                    nextMob * 0.9 +
+                    merges * 13 +
+                    pairs * 1.6 +
+                    mergeReady * 2.4 -
+                    isolated * 5 -
+                    usable * 0.7 -
+                    stranded.blockedCells * 22 -
+                    stranded.blockedGroups * 8 -
+                    stranded.endangeredPairs * 3
+                );
+            }
+            function showNextMove(first) {
+                const panel = document.querySelector("#nextMovePreview");
+                if (!panel) return;
+                if (!first || !first.nextRecommendation) {
+                    panel.textContent = nextPieceLevels.length ? "이 첫 배치 이후 다음 블록을 놓을 자리가 없습니다." : "다음 블록을 입력하면 2수 앞 탐색을 수행합니다.";
+                    return;
+                }
+                const second = first.nextRecommendation;
+                const coordinates = second.pos.map((k, i) => {
+                    const c = cells.find(x => x.k === k);
+                    return `행${c.r + 1}·칸${c.q + Math.floor(c.r / 2) + 1} (레벨 ${nextPieceLevels[i]})`;
+                }).join(", ");
+            }
+            function recommend() {
+                if (!pieceLevels.length) {
+                    document.querySelector("#status").textContent = "놓을 블록을 먼저 입력하세요.";
+                    document.querySelector("#results").innerHTML = "";
+                    document.querySelector("#bestSummary").innerHTML = "";
+                    document.querySelector("#nextMovePreview").textContent = "";
+                    document.querySelector("#applyBest").disabled = true;
+                    recommendation = null;
+                    drawBoard();
+                    return;
+                }
+                let list = placements(board, currentShape, pieceLevels);
+                document.querySelector("#fitCount").textContent = list.length;
+                document.querySelector("#mergeCount").textContent = "—";
+                let results = document.querySelector("#results"),
+                    status = document.querySelector("#status");
+                results.innerHTML = "";
+                recommendation = null;
+                document.querySelector("#applyBest").disabled = true;
+                if (!list.length) {
+                    status.textContent =
+                        "이 블록을 놓을 수 있는 위치가 없습니다. 입력한 보드와 블록을 확인하세요.";
+                    drawBoard();
+                    return;
+                }
+                list.forEach((p) => {
+                    const future = scoreTwoMoves(p);
+                    p.score = future.score;
+                    p.nextRecommendation = future.next;
+                    p.nextCount = future.count;
+                });
+                list.sort((a, b) => b.score - a.score);
+                recommendation = list[0];
+                document.querySelector("#mergeCount").textContent =
+                    recommendation.merges;
+                status.textContent = `첫 블록 배치 ${list.length}개와 각 배치의 다음 블록까지 계산했습니다. 점수가 높은 순서로 표시합니다.`;
+                let cellsBest = recommendation.pos;
+                drawBoard(cellsBest, [], pieceLevels);
+                showNextMove(recommendation);
+                document.querySelector("#bestSummary").innerHTML =
+                    `<div class="stats"><div class="stat"><b>${recommendation.merges}</b><span>예상 연쇄 병합</span></div><div class="stat"><b>${cells.filter((c) => !recommendation.board[c.k]).length}</b><span>배치 후 빈칸</span></div><div class="stat"><b>${Math.round(recommendation.score)}</b><span>휴리스틱 점수</span></div></div>`;
+                list.slice(0, 8).forEach((p, i) => {
+                    let d = document.createElement("div");
+                    d.className = "result" + (i === 0 ? " best" : "");
+                    let coords = p.pos
+                        .map((k) => {
+                            let c = cells.find((c) => c.k === k);
+                            return `행${c.r + 1}·칸${c.q + Math.floor(c.r / 2) + 1}`;
+                        })
+                        .join(", ");
+                    d.innerHTML = `<div><strong>${i + 1}위 · ${coords}</strong><small>첫 합성 ${p.merges}회 · 다음 배치 ${p.nextCount}개 · 다음 합성 ${p.nextRecommendation ? p.nextRecommendation.merges : 0}회</small></div><span class="pill">${Math.round(p.score)}점</span>`;
+                    d.addEventListener("click", () => {
+                        recommendation = p;
+                        drawBoard(p.pos, [], pieceLevels);
+                        showNextMove(p);
+                        document.querySelector("#applyBest").disabled = false;
+                        document
+                            .querySelectorAll(".result")
+                            .forEach((x) => x.classList.remove("best"));
+                        d.classList.add("best");
+                    });
+                    results.appendChild(d);
+                });
+                document.querySelector("#applyBest").disabled = false;
+            }
+            function updateStats() {
+                document.querySelector("#emptyCount").textContent =
+                    cells.filter((c) => !board[c.k]).length;
+                document.querySelector("#fitCount").textContent =
+                    pieceLevels.length ? countPlacements(board, currentShape) : 0;
+            }
+            document.querySelectorAll("[data-shape]").forEach((b) => {
+                b.style.display = "none";
+                b.addEventListener("click", () => {
+                    document
+                        .querySelectorAll("[data-shape]")
+                        .forEach((x) => x.classList.remove("active"));
+                    b.classList.add("active");
+                    currentShape = b.dataset.shape;
+                    pieceLevels = Array(shapes[currentShape].length).fill(1);
+                    renderPieceLevels();
+                    recommendation = null;
+                    updateStats();
+                });
+            });
+            document
+                .querySelector("#clearBoard")
+                .addEventListener("click", () => {
+                    undoBoard = { ...board };
+                    cells.forEach((c) => (board[c.k] = 0));
+                    recommendation = null;
+                    drawBoard();
+                    updateStats();
+                    document.querySelector("#results").innerHTML = "";
+                    document.querySelector("#bestSummary").innerHTML = "";
+                    document.querySelector("#nextMovePreview").textContent = "";
+                });
+            document
+                .querySelector("#demoBoard")
+                .addEventListener("click", () => {
+                    undoBoard = { ...board };
+                    cells.forEach((c) => (board[c.k] = 0));
+                    [
+                        [0, 0, 1],
+                        [1, 0, 1],
+                        [2, 1, 2],
+                        [0, 2, 1],
+                        [1, 2, 1],
+                        [2, 2, 2],
+                        [3, 3, 3],
+                        [1, 4, 2],
+                        [2, 4, 2],
+                    ].forEach(([q, r, v]) => {
+                        let k = key(q, r);
+                        if (cellSet.has(k)) board[k] = v;
+                    });
+                    drawBoard();
+                    updateStats();
+                });
+            document.querySelector("#undo").addEventListener("click", () => {
+                if (undoBoard) {
+                    board = { ...undoBoard };
+                    undoBoard = null;
+                    drawBoard();
+                    updateStats();
+                }
+            });
+            document
+                .querySelector("#recommend")
+                .addEventListener("click", recommend);
+            document
+                .querySelector("#applyBest")
+                .addEventListener("click", () => {
+                    if (!recommendation) return;
+                    undoBoard = { ...board };
+                    board = { ...recommendation.board };
+                    recommendation = null;
+                    drawBoard();
+                    updateStats();
+                    document.querySelector("#status").textContent =
+                        "추천 배치를 보드에 적용했습니다. 다음 블록을 입력해 계속 진행하세요.";
+                    document.querySelector("#applyBest").disabled = true;
+                    document.querySelector("#results").innerHTML = "";
+                    document.querySelector("#bestSummary").innerHTML = "";
+                    document.querySelector("#nextMovePreview").textContent = "";
+                });
+            document
+                .querySelector("#clearHighlight")
+                .addEventListener("click", () => {
+                    drawBoard();
+                    recommendation = null;
+                    document.querySelector("#applyBest").disabled = true;
+                });
+            // 시작할 때 두 미니 보드의 선택 상태를 반드시 비운다.
+            pieceBoard = {};
+            nextPieceBoard = {};
+            pieceLevels = [];
+            nextPieceLevels = [];
+            syncNextPieceFromBoard();
+            renderNextPieceLevels();
+            syncPieceFromBoard();
+            drawLegend();
+            renderPieceLevels();
+            drawBoard();
+            updateStats();
+        </script>
     </body>
 </html>

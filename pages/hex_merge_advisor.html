@@ -9,10 +9,6 @@
     <body oncontextmenu="return false">
         <main>
             <h1>유물 공방 배치 추천기</h1>
-            <p class="sub">
-                5–4–5–4–5 보드(23칸)에서 현재 블록을 어디에 놓는 게 유리한지
-                계산합니다.
-            </p>
             <div class="layout">
                 <section>
                     <div class="panel">
@@ -46,16 +42,6 @@
                             <div id="nextMovePreview" style="margin-top:12px;color:#dbe5f5;line-height:1.7"></div>
                         </div>
                         <div class="controls">
-                            <label class="hint">
-                                보이는 다음 블록(선택):
-                                <select id="nextPiece">
-                                    <option value="unknown">모름 / 무시</option>
-                                    <option value="single">1칸</option>
-                                    <option value="domino">2칸</option>
-                                    <option value="line3">3칸 직선</option>
-                                    <option value="bend3">3칸 꺾임</option>
-                                </select>
-                            </label>
                             <button id="recommend" class="primary">
                                 최선의 배치 찾기
                             </button>
@@ -272,7 +258,6 @@
                 el.innerHTML = "";
 
                 const title = document.createElement("div");
-                title.textContent = "놓을 블록 입력 보드 · 빈칸을 클릭해 블록을 추가하고, 블록을 클릭해 레벨을 변경하세요. (최대 3칸)";
                 title.style.cssText = "width:100%;margin-bottom:8px;font-size:13px;color:#aeb8ca;";
                 el.appendChild(title);
 
@@ -371,7 +356,6 @@
                 el.innerHTML = "";
 
                 const title = document.createElement("div");
-                title.textContent = "다음 블록 입력 보드 · 빈칸을 클릭해 블록을 추가하고, 블록을 클릭해 레벨을 변경하세요. (최대 3칸)";
                 title.style.cssText = "width:100%;margin-bottom:8px;font-size:13px;color:#aeb8ca;";
                 el.appendChild(title);
 
@@ -740,7 +724,6 @@
                     const c = cells.find(x => x.k === k);
                     return `행${c.r + 1}·칸${c.q + Math.floor(c.r / 2) + 1} (레벨 ${nextPieceLevels[i]})`;
                 }).join(", ");
-                panel.innerHTML = `<b>추천하는 다음 블록 배치</b><div style="margin-top:6px">${coordinates}</div><small>다음 블록까지 적용한 예상 합성: ${first.merges + second.merges}회</small>`;
             }
             function recommend() {
                 let list = placements(board, currentShape, pieceLevels);
