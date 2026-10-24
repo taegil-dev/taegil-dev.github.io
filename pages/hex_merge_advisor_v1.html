@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="hex_merge_advisor.css" />
+        <title>유물 공방 배치 추천기</title>
+    </head>
+    <body oncontextmenu="return false">
+        <main>
+            <h1>유물 공방 배치 추천기</h1>
+            <div class="layout">
+                <section>
+                    <div class="panel">
+                        <h2>1. 현재 보드 입력</h2>
+                        <p class="hint">
+                            칸을 클릭해 빈칸 → 레벨 1 → 레벨 2 … 순서로
+                            바꾸세요. 화면의 보드와 같게 입력하면 됩니다.
+                        </p>
+                        <svg
+                            id="board"
+                            viewBox="0 0 390 420"
+                            aria-label="육각형 보드"
+                        ></svg>
+                        <div class="legend" id="legend"></div>
+                        <div class="controls" style="margin-top: 12px">
+                            <button id="clearBoard">보드 초기화</button
+                            ><button id="demoBoard">예시 보드</button
+                            ><button id="undo">직전 배치 되돌리기</button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h2>2. 놓을 블록 입력</h2>
+                        <p class="hint">
+                            육각형 칸의 레벨을 지정하세요.
+                            회전은 추천 계산에서 자동으로 고려합니다.
+                        </p>
+                        <div id="pieceLevels" class="pieceCells"></div>
+                        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #596273;">
+                            <h3 style="margin:0 0 8px">다음 블록 (2수 앞 탐색)</h3>
+                            <div id="nextPieceLevels"></div>
+                            <div id="nextMovePreview" style="margin-top:12px;color:#dbe5f5;line-height:1.7"></div>
+                        </div>
+                        <div class="controls">
+                            <button id="recommend" class="primary">
+                                최선의 배치 찾기
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <aside>
+                    <div class="panel">
+                        <h2>추천 결과</h2>
+                        <p id="status" class="hint">
+                            보드와 현재 블록을 입력한 뒤 ‘최선의 배치 찾기’를
+                            누르세요.
+                        </p>
+                        <div id="bestSummary"></div>
+                        <div id="results"></div>
+                        <div class="controls" style="margin-top: 12px">
+                            <button id="applyBest" class="primary" disabled>
+                                추천 배치 적용</button
+                            ><button id="clearHighlight">
+                                추천 표시 지우기
+                            </button>
+                        </div>
+                        <div class="footer">
+                            추천 위치는 보드에서 흰색 테두리로, 블록이 차지할
+                            칸은 초록색 점선으로 표시됩니다.
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h2>평가 기준</h2>
+                        <p class="hint">
+                            현재 버전은 규칙 기반 휴리스틱으로 빈칸, 다음 블록
+                            수용 가능성, 병합 기회와 고립된 빈칸을 함께
+                            평가합니다. 절대적인 최적해를 보장하지는 않습니다.
+                        </p>
+                        <div class="stats">
+                            <div class="stat">
+                                <b id="emptyCount">23</b><span>현재 빈칸</span>
+                            </div>
+                            <div class="stat">
+                                <b id="fitCount">—</b
+                                ><span>현재 블록 배치 수</span>
+                            </div>
+                            <div class="stat">
+                                <b id="mergeCount">—</b
+                                ><span>추천 병합 수</span>
+                            </div>
+                        </div>
+                        <details>
+                            <summary>가정 및 주의사항</summary>
+                            <p class="hint">
+                                프로토타입은 각 칸에 레벨이 있고, 같은 레벨의
+                                연결된 칸이 3개 이상이면 그 연결 집단이 한 칸의
+                                상위 레벨로 합쳐진다고 가정합니다. 병합 시 남는
+                                칸은 새 블록이 놓인 칸을 우선으로 선택합니다.
+                                실제 게임의 병합 처리 방식이 다르면 추천 결과도
+                                달라질 수 있습니다. 화면 자동 인식 기능은
+                                포함하지 않았으므로 보드 상태를 직접 입력해야
+                                합니다.
+                            </p>
+                        </details>
+                    </div>
+                </aside>
+            </div>
+        </main>
+        <script src="hex_merge_advisor_v1.js"></script>
+    </body>
+</html>
