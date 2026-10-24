@@ -122,6 +122,13 @@ select {
     margin-top: 8px;
 }
 
+.card-state {
+    position: relative;
+    left: 80%;
+    top: -90%;
+    color: var(--muted);
+}
+
 .tag {
     background: #29263e;
     color: #b5aaff;

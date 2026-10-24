@@ -27,50 +27,58 @@
 
 <script>
   // 새 HTML 파일을 추가할 때 이 배열만 수정
-  const pages = [
-    {
-      title: "유물 공방 배치 추천기",
-      description: "유물 공방에서 유물의 최적 배치를 추천합니다.",
-      icon: "🏛️",
-      url: "./pages/hex_merge_advisor.html"
-    },
-    {
-      title: "발굴 탐색기",
-      description: "발굴 위치를 탐색하고 분석하는 도구",
-      icon: "⛏️",
-      url: "./pages/hidden_item_finder.html"
+    const pages = [
+        {
+            title: "발굴 탐색기",
+            description: "발굴 위치를 탐색하고 분석하는 도구",
+            icon: "⛏️",
+            url: "./pages/hidden_item_finder.html",
+            state: true,
+            version: "v1.0.0"
+        },
+        {
+            title: "유물 공방 배치 추천기",
+            description: "유물 공방에서 유물의 최적 배치를 추천합니다.",
+            icon: "🏛️",
+            url: "./pages/hex_merge_advisor.html",
+            state: false,
+            version: "v1.0.0"
+        },
+    ];
+
+    const grid = document.getElementById("grid");
+    const count = document.getElementById("count");
+    const empty = document.getElementById("empty");
+
+
+    function render() {
+        grid.replaceChildren();
+        count.textContent = `${pages.length}개의 도구`;
+        empty.hidden = pages.length !== 0;
+
+        pages.forEach(page => {
+            const card = document.createElement("a");
+            card.className = "card";
+            card.href = page.url;
+
+            const icon = document.createElement("div");
+            icon.className = "card-icon";
+            icon.textContent = page.icon;
+
+            const title = document.createElement("h3");
+            title.textContent = page.title;
+
+            const description = document.createElement("p");
+            description.textContent = page.description;
+
+            const state = document.createElement("span");
+            state.className = "card-state";
+            state.textContent = page.state ? page.version : "beta";
+
+            card.append(icon, title, description, state);
+            grid.appendChild(card);
+        });
     }
-  ];
-
-  const grid = document.getElementById("grid");
-  const count = document.getElementById("count");
-  const empty = document.getElementById("empty");
-
-
-  function render() {
-    grid.replaceChildren();
-    count.textContent = `${pages.length}개의 도구`;
-    empty.hidden = pages.length !== 0;
-
-    pages.forEach(page => {
-      const card = document.createElement("a");
-      card.className = "card";
-      card.href = page.url;
-
-      const icon = document.createElement("div");
-      icon.className = "card-icon";
-      icon.textContent = page.icon;
-
-      const title = document.createElement("h3");
-      title.textContent = page.title;
-
-      const description = document.createElement("p");
-      description.textContent = page.description;
-
-      card.append(icon, title, description);
-      grid.appendChild(card);
-    });
-  }
 
   render();
 </script>
