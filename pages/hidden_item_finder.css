@@ -84,7 +84,7 @@ button.active{
     background:var(--good)
 }
 .cell.hit-vertical { background:var(--accent); }
-.cell.hit-square { background:var(--border); }
+.cell.hit-square { background:var(--warn); }
 select { 
     background:var(--panel2); 
     color:#fff; 
@@ -93,8 +93,9 @@ select {
     border-color:var(--border);
 }
 .cell.miss{
-    background:#242e3e;
-    color:#8693a7
+    background:var(--bg);
+    color:var(--muted);
+    border: none;
 }
 .cell.best{
     border-color:#ffce66
@@ -120,7 +121,7 @@ label{
     align-items:center
 }
 input[type=number]{
-    width:12%;
+    width:15%;
     background:var(--panel2);
     color:white;
     border:1px solid var(--border);
@@ -128,7 +129,7 @@ input[type=number]{
     border-radius:6px;
 }
 #items{
-    width:20%;
+    width:25%;
 }
 .warning{
     color:#ffce66

@@ -142,7 +142,7 @@
                 const b = document.createElement('button');
                 b.className = 'cell ' + (v >= 1 && v <= 3 ? 'hit' + (v === 2 ? ' hit-vertical' : v === 3 ? ' hit-square' : '') : v === 4 ? 'miss' : '') + (i === best && v === 0 ? ' best' : '');
                 b.title = `${Math.floor(i / cols) + 1}행 ${i % cols + 1}열`;
-                b.textContent = v >= 1 && v <= 3 ? ['','가','세','□'][v] : v === 4 ? '×' : $('prob').checked && probs[i] != null ? `${(probs[i] * 100).toFixed(1)}%` : '';
+                b.textContent = v >= 1 && v <= 3 ? ['','가','세','정'][v] : v === 4 ? '×' : $('prob').checked && probs[i] != null ? `${(probs[i] * 100).toFixed(1)}%` : '';
                 b.onclick = () => {
                     history.push([...state]);
                     state[i] = state[i] === 0 ? Number($('shapeChoice').value) : state[i] === 4 ? 0 : 4;
