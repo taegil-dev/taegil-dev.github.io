@@ -84,7 +84,7 @@ button.active{
     background:var(--good)
 }
 .cell.hit-vertical { background:var(--accent); }
-.cell.hit-square { background:var(--border); }
+.cell.hit-square { background:var(--warn); }
 select { 
     background:var(--panel2); 
     color:#fff; 
