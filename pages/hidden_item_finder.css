@@ -93,8 +93,9 @@ select {
     border-color:var(--border);
 }
 .cell.miss{
-    background:#242e3e;
-    color:#8693a7
+    background:var(--bg);
+    color:var(--muted);
+    border: none;
 }
 .cell.best{
     border-color:#ffce66
@@ -103,7 +104,7 @@ select {
     font-size:clamp(9px,1.6vw,14px)
 }
 .muted{
-    color:#aab8cd;
+    color:var(--muted);
     font-size:13px
 }
 .stats{
