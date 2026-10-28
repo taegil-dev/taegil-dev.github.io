@@ -99,7 +99,7 @@
                 </p>
             </div>
             <p class="muted">
-                가능한 조합이 적으면 정확 계산, 많으면 시간 제한(약 1.4초)이 있는 조건부 표본 계산을 사용합니다. 조건부 표본 계산은 편향될 수 있으며 표본이 부족하면 결과가 불안정할 수 있습니다. 가능한 최종 배치가 동일 확률이라는 가정입니다.
+                가능한 조합이 적으면 정확 계산, 많으면 조건부 표본 계산을 사용합니다. 조건부 표본 계산은 편향될 수 있으며 표본이 부족하면 결과가 불안정할 수 있습니다. 가능한 최종 배치가 동일 확률이라는 가정입니다.
             </p>
         </div>
          <div class="panel toolbar rightbar">
@@ -198,7 +198,6 @@
             const P = placements.length;
             const counts = new Float64Array(N);
             let total = 0, nodes = 0, truncated = false, exact = false, attempts = 0;
-            const deadline = Date.now() + 1300;
             const maxNodes = Math.max(15000, Math.min(350000, limit * 5));
             const hitCandidates = hits.map(id => placements.map((p,i) => ((p.mask & bit[id]) && p.shapeType === state[id]) ? i : -1).filter(i => i >= 0));
             if (hitCandidates.some(a => a.length === 0) || P < itemCount) {
@@ -211,7 +210,7 @@
                 for (let i = 0; i < N; i++) if (state[i] === 0 && (mask & bit[i])) counts[i]++;
             }
             function visit(start, depth, mask) {
-                if (++nodes > maxNodes || Date.now() > deadline) { truncated = true; return; }
+                if (++nodes > maxNodes) { truncated = true; return; }
                 if (depth === itemCount) { record(mask); return; }
                 for (let i = start; i <= P - (itemCount - depth); i++) {
                     if (truncated) return;
@@ -235,7 +234,7 @@
                 total = 0;
                 nodes = 0;
                 function sample(mask, depth, covered) {
-                    if (++nodes > maxNodes || Date.now() > deadline) return false;
+                    if (++nodes > maxNodes) return false;
                     if (depth === itemCount) {
                         if (covered === hitMask) { record(mask); return true; }
                         return false;
@@ -260,7 +259,7 @@
                     }
                     return false;
                 }
-                while (attempts < limit && nodes < maxNodes && Date.now() < deadline) {
+                while (attempts < limit && nodes < maxNodes) {
                     attempts++;
                     sample(0n, 0, 0n);
                 }
